@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI事件创建测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        .test-button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        .test-button:hover {
+            background: #0056B3;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #007AFF;
+        }
+        .console-log {
+            background: #000;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 AI事件创建功能测试</h1>
+        
+        <div class="test-section">
+            <h2>📋 测试说明</h2>
+            <p>请按以下步骤测试AI事件创建功能：</p>
+            <ol>
+                <li>打开浏览器控制台（F12）查看详细日志</li>
+                <li>在主应用中使用AI聊天功能</li>
+                <li>尝试以下测试指令</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h2>🎯 建议测试指令</h2>
+            <div>
+                <button class="test-button" onclick="copyToClipboard('明天下午2点开个项目会议，1小时')">
+                    📅 基础事件创建
+                </button>
+                <button class="test-button" onclick="copyToClipboard('下周一早上安排团队站会，30分钟')">
+                    🕘 周期事件
+                </button>
+                <button class="test-button" onclick="copyToClipboard('今天晚上7点在星巴克和客户见面')">
+                    📍 带地点事件
+                </button>
+                <button class="test-button" onclick="copyToClipboard('下个月15号安排产品发布会，2小时，重要')">
+                    ⭐ 重要事件
+                </button>
+            </div>
+            <div class="result" id="copyResult" style="display: none;">
+                <span class="success">✅ 指令已复制到剪贴板！请在AI聊天框中粘贴使用</span>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔧 测试步骤</h2>
+            <ol>
+                <li><strong>前往应用</strong>：打开 <a href="http://localhost:5174" target="_blank">http://localhost:5174</a></li>
+                <li><strong>进入Dashboard</strong>：点击AI聊天框</li>
+                <li><strong>测试创建事件</strong>：使用上面的测试指令</li>
+                <li><strong>验证同步</strong>：检查事件是否出现在：
+                    <ul>
+                        <li>日历视图（切换到Calendar页面）</li>
+                        <li>待办事项列表</li>
+                        <li>Dashboard的小日历</li>
+                    </ul>
+                </li>
+                <li><strong>跨页面测试</strong>：在Calendar页面的AI聊天中也创建事件</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h2>✅ 预期结果</h2>
+            <ul>
+                <li>✅ AI成功解析自然语言指令</li>
+                <li>✅ 事件在日历中正确显示</li>
+                <li>✅ 同步到待办事项列表</li>
+                <li>✅ 跨页面实时同步</li>
+                <li>✅ 控制台显示详细创建日志</li>
+                <li>✅ 显示成功通知消息</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>🐛 故障排查</h2>
+            <div>
+                <button class="test-button" onclick="checkLocalStorage()">
+                    📦 检查本地存储
+                </button>
+                <button class="test-button" onclick="checkEventCount()">
+                    📊 检查事件数量
+                </button>
+                <button class="test-button" onclick="clearAllData()">
+                    🗑️ 清空测试数据
+                </button>
+            </div>
+            <div id="debugResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📝 控制台日志监控</h2>
+            <p>重要日志关键词：</p>
+            <div class="console-log">
+AI正在调用autoScheduleEvent
+CalendarService.createEvent 被调用
+创建的事件对象:
+事件添加到数组后，总事件数:
+Dashboard AI成功创建事件:
+触发全局事件更新通知
+接收到全局事件更新:
+✅ 事件创建成功！</div>
+        </div>
+    </div>
+
+    <script>
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const result = document.getElementById('copyResult');
+                result.style.display = 'block';
+                setTimeout(() => {
+                    result.style.display = 'none';
+                }, 3000);
+            });
+        }
+
+        function checkLocalStorage() {
+            const events = localStorage.getItem('calendar_events');
+            const todos = localStorage.getItem('todos');
+            const result = document.getElementById('debugResult');
+            
+            let content = '<h3>📦 本地存储状态</h3>';
+            content += `<p><strong>日历事件:</strong> ${events ? JSON.parse(events).length + ' 个事件' : '无数据'}</p>`;
+            content += `<p><strong>待办事项:</strong> ${todos ? JSON.parse(todos).length + ' 个任务' : '无数据'}</p>`;
+            
+            if (events) {
+                const eventList = JSON.parse(events);
+                content += '<h4>最近的事件:</h4><ul>';
+                eventList.slice(-5).forEach(event => {
+                    content += `<li>${event.title} - ${new Date(event.startTime).toLocaleString()}</li>`;
+                });
+                content += '</ul>';
+            }
+            
+            result.innerHTML = content;
+            result.style.display = 'block';
+        }
+
+        function checkEventCount() {
+            const events = localStorage.getItem('calendar_events');
+            const result = document.getElementById('debugResult');
+            
+            if (events) {
+                const eventList = JSON.parse(events);
+                result.innerHTML = `
+                    <h3>📊 事件统计</h3>
+                    <p class="success">总事件数: ${eventList.length}</p>
+                    <p>今天的事件: ${eventList.filter(e => {
+                        const eventDate = new Date(e.startTime).toDateString();
+                        const today = new Date().toDateString();
+                        return eventDate === today;
+                    }).length}</p>
+                `;
+            } else {
+                result.innerHTML = '<p class="error">❌ 未找到任何事件数据</p>';
+            }
+            result.style.display = 'block';
+        }
+
+        function clearAllData() {
+            localStorage.removeItem('calendar_events');
+            localStorage.removeItem('todos');
+            localStorage.removeItem('chatHistory');
+            
+            const result = document.getElementById('debugResult');
+            result.innerHTML = '<p class="success">✅ 所有测试数据已清空</p>';
+            result.style.display = 'block';
+        }
+
+        // 监听全局事件更新
+        window.addEventListener('calendarEventsUpdated', (event) => {
+            console.log('测试页面接收到全局事件更新:', event.detail);
+        });
+    </script>
+</body>
+</html> 
