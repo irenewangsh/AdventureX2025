@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { X, Calendar, Clock, MapPin, Repeat, Bell, Palette, Bot, Sparkles } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { X, Calendar, Clock, MapPin, Repeat, Bell, Palette, Bot, Sparkles, Trash2, AlertTriangle } from 'lucide-react'
 import { CalendarEvent } from '../services/calendarService'
 import LocationPicker from './LocationPicker'
 import { Location } from '../services/mapService'
@@ -11,9 +11,10 @@ interface EventFormProps {
   event?: CalendarEvent | null
   onSubmit: (eventData: Partial<CalendarEvent>) => void
   onCancel: () => void
+  onDelete?: (eventId: string) => void
 }
 
-const EventForm: React.FC<EventFormProps> = ({ event, onSubmit, onCancel }) => {
+const EventForm: React.FC<EventFormProps> = ({ event, onSubmit, onCancel, onDelete }) => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -30,6 +31,7 @@ const EventForm: React.FC<EventFormProps> = ({ event, onSubmit, onCancel }) => {
   const [showAIRecommendations, setShowAIRecommendations] = useState(false)
   const [aiRecommendations, setAIRecommendations] = useState<Array<{ name: string; address: string; reason: string }>>([])
   const [isLoadingAI, setIsLoadingAI] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // 初始化表单数据
   useEffect(() => {
@@ -402,23 +404,105 @@ const EventForm: React.FC<EventFormProps> = ({ event, onSubmit, onCancel }) => {
           </div>
 
           {/* 操作按钮 */}
-          <div className="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              取消
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-            >
-              {event ? '更新事件' : '创建事件'}
-            </button>
+          <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+            {/* 删除按钮 - 仅在编辑现有事件时显示 */}
+            <div>
+              {event && onDelete && (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors flex items-center space-x-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>删除事件</span>
+                </button>
+              )}
+            </div>
+
+            {/* 主要操作按钮 */}
+            <div className="flex items-center space-x-3">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+              >
+                {event ? '更新事件' : '创建事件'}
+              </button>
+            </div>
           </div>
         </form>
       </motion.div>
+
+      {/* 删除确认对话框 */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowDeleteConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
+            >
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="flex-shrink-0">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">
+                    确认删除事件
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    此操作不可撤销
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                <p className="text-sm text-gray-700">
+                  <span className="font-medium">事件标题:</span> {event?.title}
+                </p>
+                <p className="text-sm text-gray-700 mt-1">
+                  <span className="font-medium">时间:</span> {event?.startTime.toLocaleString('zh-CN')}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end space-x-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    if (event && onDelete) {
+                      onDelete(event.id)
+                      setShowDeleteConfirm(false)
+                    }
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center space-x-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>确认删除</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

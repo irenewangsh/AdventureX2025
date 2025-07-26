@@ -14,6 +14,7 @@ interface AuthModalProps {
 type AuthMode = 'login' | 'register' | 'reset'
 
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
+  console.log('🔐 AuthModal 渲染，isOpen:', isOpen)
   const [mode, setMode] = useState<AuthMode>('login')
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)

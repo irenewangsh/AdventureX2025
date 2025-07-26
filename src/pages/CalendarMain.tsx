@@ -23,13 +23,14 @@ import {
   User,
   LogOut,
   Star,
+  X,
   Brain,
   Mail
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'react-hot-toast'
 import { useAppContext } from '../App'
-import { getCareerStyles } from '../utils/careerConfig'
+import { getCareerStyles, getCareerConfig } from '../utils/careerConfig'
 import CalendarService, { CalendarEvent, CalendarView } from '../services/calendarService'
 import GoogleCalendarService from '../services/googleCalendarService'
 import AuthService, { User as AuthUser } from '../services/authService'
@@ -38,7 +39,7 @@ import AICalendarService from '../services/aiCalendarService'
 import EventForm from '../components/EventForm'
 import AICalendarChat from '../components/AICalendarChat'
 import CalendarGridView from '../components/CalendarGridView'
-import AuthModal from '../components/AuthModal'
+// import AuthModal from '../components/AuthModal'
 import ConfigurationBanner from '../components/ConfigurationBanner'
 import MapService from '../services/mapService'
 import SmartSchedulePanel from '../components/SmartSchedulePanel'
@@ -70,7 +71,7 @@ const CalendarMain: React.FC = () => {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
-  const [showConfigBanner, setShowConfigBanner] = useState(!AuthService.isConfigured())
+  const [showConfigBanner, setShowConfigBanner] = useState(false)
 
   useEffect(() => {
     // 监听认证状态
@@ -208,10 +209,31 @@ const CalendarMain: React.FC = () => {
 
   // 删除事件
   const handleDeleteEvent = (id: string) => {
-    if (window.confirm('确定要删除这个事件吗？')) {
-      CalendarService.deleteEvent(id)
-      setEvents(prev => prev.filter(event => event.id !== id))
-      toast.success('事件删除成功！')
+    try {
+      const success = CalendarService.deleteEvent(id)
+      if (success) {
+        setEvents(prev => prev.filter(event => event.id !== id))
+        
+        // 如果启用了Google同步，也从Google Calendar删除
+        if (user) {
+          GoogleCalendarService.deleteEvent(id).catch(error => {
+            console.warn('Google Calendar删除失败:', error)
+            toast.error('本地删除成功，但Google Calendar同步失败')
+          })
+        }
+        
+        toast.success('事件删除成功！')
+        
+        // 触发全局事件更新
+        window.dispatchEvent(new CustomEvent('calendarEventsUpdated', {
+          detail: { action: 'delete', eventId: id }
+        }))
+      } else {
+        toast.error('删除事件失败')
+      }
+    } catch (error) {
+      console.error('删除事件时发生错误:', error)
+      toast.error('删除事件失败')
     }
   }
 
@@ -410,19 +432,7 @@ const CalendarMain: React.FC = () => {
     })
   }
 
-  const getCareerConfig = (career: string) => {
-    const configs = {
-      programmer: { name: '程序员', emoji: '💻' },
-      teacher: { name: '教师', emoji: '📚' },
-      doctor: { name: '医生', emoji: '🏥' },
-      sales: { name: '销售', emoji: '💼' },
-      finance: { name: '金融', emoji: '📊' },
-      student: { name: '学生', emoji: '🎓' },
-      freelancer: { name: '自由职业', emoji: '🎨' },
-      office_worker: { name: '上班族', emoji: '👔' }
-    }
-    return configs[career as keyof typeof configs] || configs.programmer
-  }
+
 
   const categories = [
     { id: 'work', name: '工作', color: '#374151' },
@@ -486,7 +496,13 @@ const CalendarMain: React.FC = () => {
               </div>
             ) : (
               <button
-                onClick={() => setShowAuthModal(true)}
+                onClick={() => {
+                  console.log('🔐 登录按钮被点击')
+                  console.log('🔐 当前用户状态:', user)
+                  console.log('🔐 showAuthModal状态:', showAuthModal)
+                  setShowAuthModal(true)
+                  console.log('🔐 setShowAuthModal(true) 已调用')
+                }}
                 className={`flex items-center space-x-2 px-4 py-2 ${styles.button} transition-colors`}
                 style={{ borderRadius: styles.borderRadius }}
               >
@@ -803,14 +819,29 @@ const CalendarMain: React.FC = () => {
                 initial={{ opacity: 0, x: 400 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 400 }}
-                                  className="fixed top-20 right-6 w-96 max-w-[calc(100vw-3rem)] h-[calc(100vh-120px)] z-50 bg-white rounded-lg border border-gray-200 shadow-2xl overflow-hidden md:w-96 sm:w-80"
+                className={`fixed top-20 right-6 w-96 max-w-[calc(100vw-3rem)] h-[calc(100vh-120px)] z-50 ${styles.card} shadow-2xl overflow-hidden md:w-96 sm:w-80`}
+                style={{ 
+                  borderRadius: styles.borderRadius,
+                  fontFamily: styles.fontSecondary
+                }}
               >
                 <div className="h-full flex flex-col">
-                  <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-500 to-purple-600 text-white">
-                    <h3 className="font-semibold">🤖 AI 日历助手</h3>
+                  <div className={`flex items-center justify-between p-4 border-b ${styles.fontMono}`}
+                       style={{ 
+                         backgroundColor: styles.accent + '20',
+                         borderColor: styles.accent + '40',
+                         color: styles.accent
+                       }}>
+                    <h3 className="font-semibold">// AI 日历助手</h3>
                     <button
                       onClick={() => setShowAIChat(false)}
-                      className="p-1 hover:bg-white/20 rounded transition-colors"
+                      className="p-1 transition-colors"
+                      style={{ 
+                        backgroundColor: 'transparent',
+                        borderRadius: styles.borderRadius
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = styles.accent + '20'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       ✕
                     </button>
@@ -819,9 +850,11 @@ const CalendarMain: React.FC = () => {
                     <AICalendarChat
                       onLocationSelect={handleLocationSelect}
                       onEventCreate={handleAIEventCreate}
+                      onEventDelete={handleDeleteEvent}
                       userLocation={userLocation}
                       context="calendar"
                       height={undefined}
+                      styles={styles}
                     />
                   </div>
                 </div>
@@ -836,6 +869,7 @@ const CalendarMain: React.FC = () => {
           isOpen={showSmartPanel}
           onClose={() => setShowSmartPanel(false)}
           selectedDate={currentDate}
+          styles={styles}
         />
 
         {/* 事件表单 */}
@@ -853,6 +887,11 @@ const CalendarMain: React.FC = () => {
               setShowEventForm(false)
               setEditingEvent(null)
             }}
+            onDelete={(eventId) => {
+              handleDeleteEvent(eventId)
+              setShowEventForm(false)
+              setEditingEvent(null)
+            }}
           />
         )}
 
@@ -862,15 +901,49 @@ const CalendarMain: React.FC = () => {
           onClose={() => setShowEmailManager(false)}
         />
 
-        {/* 认证模态框 */}
+        {/* 临时认证界面 */}
         {showAuthModal && (
-          <AuthModal 
-            onClose={() => setShowAuthModal(false)}
-            onSuccess={() => {
-              setShowAuthModal(false)
-              handleSyncWithGoogle() // Changed from handleGoogleCalendarSync to handleSyncWithGoogle
-            }}
-          />
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900">登录</h2>
+                <button 
+                  onClick={() => {
+                    console.log('🔐 关闭按钮被点击')
+                    setShowAuthModal(false)
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-full"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <button
+                  onClick={async () => {
+                    console.log('🔐 Google登录按钮被点击')
+                    try {
+                      const user = await AuthService.signInWithGoogle()
+                      console.log('🔐 Google登录成功:', user)
+                      setUser(user)
+                      setShowAuthModal(false)
+                      toast.success('Google 登录成功！')
+                    } catch (error: any) {
+                      console.error('🔐 Google登录失败:', error)
+                      toast.error(error.message)
+                    }
+                  }}
+                  className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <span>🔐 使用 Google 登录</span>
+                </button>
+                
+                <div className="text-center text-sm text-gray-500">
+                  点击上方按钮进行Google登录
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

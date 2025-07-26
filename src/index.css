@@ -59,6 +59,15 @@ select:focus-visible {
   outline-offset: 2px;
 }
 
+/* 移除对话框输入框的蓝色边框 */
+.no-focus-outline:focus,
+.no-focus-outline:focus-visible {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  ring: none !important;
+}
+
 /* Card styles */
 .card-hover:hover {
   transform: translateY(-2px);

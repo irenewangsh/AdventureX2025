@@ -274,7 +274,7 @@ function Dashboard() {
         if (aiResponse.functionCalls && aiResponse.functionCalls.length > 0) {
           console.log('✅ Dashboard收到AI函数调用结果:', aiResponse.functionCalls)
           
-          // AI服务已经处理了事件创建，这里只需要响应结果
+          // AI服务已经处理了事件创建和删除，这里只需要响应结果
           for (const functionCall of aiResponse.functionCalls) {
             if (functionCall.name === 'createCalendarEvent' && functionCall.success) {
               console.log('📅 Dashboard确认事件创建成功:', functionCall.result)
@@ -283,6 +283,16 @@ function Dashboard() {
               const updatedEvents = CalendarService.getEvents()
               console.log('Dashboard 刷新事件列表, 总事件数:', updatedEvents.length)
               setEvents(updatedEvents)
+            } else if (functionCall.name === 'deleteCalendarEvent' && functionCall.success) {
+              console.log('🗑️ Dashboard确认事件删除成功:', functionCall.result)
+              
+              // 刷新本地事件列表
+              const updatedEvents = CalendarService.getEvents()
+              console.log('Dashboard 刷新事件列表, 总事件数:', updatedEvents.length)
+              setEvents(updatedEvents)
+              
+              // 显示删除成功提示
+              toast.success('事件已成功删除')
             }
           }
         }
@@ -434,7 +444,7 @@ function Dashboard() {
         <div className="p-4 border-b" style={{ borderColor: styles.border }}>
           <div className="flex items-center justify-between mb-4">
             <button 
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              onClick={() => setMenuOpen(!menuOpen)}
               className={`p-2 ${styles.card} transition-colors`}
             >
               <Terminal className="w-4 h-4" style={{ color: styles.textLight }} />
@@ -645,12 +655,18 @@ function Dashboard() {
                         value={chatMessage}
                         onChange={(e) => setChatMessage(e.target.value)}
                         placeholder={`输入 ${careerConfig.name} 相关内容...`}
-                        className="flex-1 px-2 py-3 bg-transparent border-none outline-none placeholder-gray-400"
+                        className="flex-1 px-2 py-3 bg-transparent border-none outline-none placeholder-gray-400 focus:outline-none focus:ring-0 focus:border-none no-focus-outline"
                         style={{ 
                           fontFamily: styles.fontSecondary,
-                          color: styles.text
+                          color: styles.text,
+                          boxShadow: 'none'
                         }}
                         onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                        onFocus={(e) => {
+                          e.target.style.outline = 'none'
+                          e.target.style.boxShadow = 'none'
+                          e.target.style.border = 'none'
+                        }}
                         disabled={isLoading}
                       />
                     </div>
@@ -853,12 +869,18 @@ function Dashboard() {
                       value={chatMessage}
                       onChange={(e) => setChatMessage(e.target.value)}
                       placeholder="输入消息..."
-                      className="flex-1 px-2 py-3 bg-transparent border-none outline-none placeholder-gray-400"
+                      className="flex-1 px-2 py-3 bg-transparent border-none outline-none placeholder-gray-400 focus:outline-none focus:ring-0 focus:border-none no-focus-outline"
                       style={{ 
                         fontFamily: styles.fontSecondary,
-                        color: styles.text
+                        color: styles.text,
+                        boxShadow: 'none'
                       }}
                       onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                      onFocus={(e) => {
+                        e.target.style.outline = 'none'
+                        e.target.style.boxShadow = 'none'
+                        e.target.style.border = 'none'
+                      }}
                       disabled={isLoading}
                     />
                   </div>
@@ -882,6 +904,7 @@ function Dashboard() {
         isOpen={showSmartAnalysis}
         onClose={() => setShowSmartAnalysis(false)}
         selectedDate={new Date()}
+        styles={styles}
       />
     </div>
   )

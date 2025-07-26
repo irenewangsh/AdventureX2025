@@ -25,17 +25,31 @@ class AuthService {
   private googleProvider: GoogleAuthProvider | null = null
 
   constructor() {
-    if (isFirebaseConfigured && auth) {
-      this.googleProvider = new GoogleAuthProvider()
-      this.googleProvider.addScope('https://www.googleapis.com/auth/calendar')
-      this.googleProvider.addScope('https://www.googleapis.com/auth/calendar.events')
+    // 稍后在实际使用时再检查Firebase状态
+    console.log('🔐 AuthService初始化中...')
+  }
+
+  // 延迟初始化Google Provider
+  private initializeGoogleProvider() {
+    if (!this.googleProvider && isFirebaseConfigured && auth) {
+      try {
+        this.googleProvider = new GoogleAuthProvider()
+        this.googleProvider.addScope('https://www.googleapis.com/auth/calendar')
+        this.googleProvider.addScope('https://www.googleapis.com/auth/calendar.events')
+        console.log('✅ Google Provider已初始化')
+      } catch (error) {
+        console.warn('⚠️ Google Provider初始化失败:', error)
+      }
     }
   }
 
   // 检查Firebase是否已配置
   private checkFirebaseConfig(): boolean {
-    if (!isFirebaseConfigured || !auth) {
+    if (!isFirebaseConfigured) {
       throw new Error('Firebase未配置。请参考SETUP_GUIDE.md设置Firebase配置。')
+    }
+    if (!auth) {
+      throw new Error('Firebase Auth未初始化。请检查配置。')
     }
     return true
   }
@@ -70,6 +84,8 @@ class AuthService {
   // Google OAuth 登录
   async signInWithGoogle(): Promise<User> {
     this.checkFirebaseConfig()
+    this.initializeGoogleProvider()
+    
     if (!this.googleProvider) {
       throw new Error('Google认证提供商未初始化')
     }
@@ -112,20 +128,35 @@ class AuthService {
 
   // 监听认证状态变化
   onAuthStateChange(callback: (user: User | null) => void): () => void {
-    if (!isFirebaseConfigured || !auth) {
+    if (!isFirebaseConfigured) {
       // 如果Firebase未配置，返回空的清理函数
       console.warn('Firebase未配置，认证状态监听器被禁用')
       callback(null)
       return () => {}
     }
     
-    return onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        callback(this.transformUser(firebaseUser))
-      } else {
-        callback(null)
-      }
-    })
+    if (!auth) {
+      // Firebase配置了但auth未初始化，尝试稍后重试
+      console.warn('Firebase Auth未初始化，延迟1秒后重试...')
+      setTimeout(() => {
+        this.onAuthStateChange(callback)
+      }, 1000)
+      return () => {}
+    }
+    
+    try {
+      return onAuthStateChanged(auth, (firebaseUser) => {
+        if (firebaseUser) {
+          callback(this.transformUser(firebaseUser))
+        } else {
+          callback(null)
+        }
+      })
+    } catch (error) {
+      console.error('认证状态监听器设置失败:', error)
+      callback(null)
+      return () => {}
+    }
   }
 
   // 获取当前用户

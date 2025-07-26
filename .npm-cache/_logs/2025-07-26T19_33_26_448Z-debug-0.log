@@ -1,0 +1,18 @@
+0 verbose cli F:\nodejs\node.exe F:\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@10.9.2
+2 info using node@v22.17.0
+3 silly config load:file:F:\nodejs\node_modules\npm\npmrc
+4 silly config load:file:E:\Berkeley\Researches\AdventureX_heckathon\Project-Calendar\AdventureX2025\.npmrc
+5 silly config load:file:C:\Users\alexy\.npmrc
+6 silly config load:file:F:\nodejs\node_global\etc\npmrc
+7 verbose title npm run setup
+8 verbose argv "run" "setup"
+9 verbose logfile logs-max:10 dir:E:\Berkeley\Researches\AdventureX_heckathon\Project-Calendar\AdventureX2025\.npm-cache\_logs\2025-07-26T19_33_26_448Z-
+10 verbose logfile E:\Berkeley\Researches\AdventureX_heckathon\Project-Calendar\AdventureX2025\.npm-cache\_logs\2025-07-26T19_33_26_448Z-debug-0.log
+11 silly logfile done cleaning log files
+12 verbose cwd E:\Berkeley\Researches\AdventureX_heckathon\Project-Calendar\AdventureX2025
+13 verbose os Windows_NT 10.0.26100
+14 verbose node v22.17.0
+15 verbose npm  v10.9.2
+16 verbose exit 1
+17 verbose code 1

@@ -1,0 +1,12 @@
+0 verbose cli F:\nodejs\node.exe F:\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@10.9.2
+2 info using node@v22.17.0
+3 silly config load:file:F:\nodejs\node_modules\npm\npmrc
+4 silly config load:file:E:\Berkeley\Researches\AdventureX_heckathon\Project-Calendar\AdventureX2025\.npmrc
+5 silly config load:file:C:\Users\alexy\.npmrc
+6 silly config load:file:F:\nodejs\node_global\etc\npmrc
+7 verbose title npm run dev
+8 verbose argv "run" "dev"
+9 verbose logfile logs-max:10 dir:E:\Berkeley\Researches\AdventureX_heckathon\Project-Calendar\AdventureX2025\.npm-cache\_logs\2025-07-26T18_10_05_381Z-
+10 verbose logfile E:\Berkeley\Researches\AdventureX_heckathon\Project-Calendar\AdventureX2025\.npm-cache\_logs\2025-07-26T18_10_05_381Z-debug-0.log
+11 silly logfile done cleaning log files

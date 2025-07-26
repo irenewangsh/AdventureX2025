@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Bot, User, MapPin, Search, Globe, Loader2, Sparkles, ExternalLink, History, Settings } from 'lucide-react'
+import { Send, Bot, User, MapPin, Search, Globe, Loader2, Sparkles, ExternalLink, History, Settings, Terminal } from 'lucide-react'
 import aiService, { AIResponse, AIRequestOptions } from '../services/aiService'
 import MapService from '../services/mapService'
 import chatHistoryService, { ChatMessage } from '../services/chatHistoryService'
@@ -11,17 +11,21 @@ import ChatHistoryPanel from './ChatHistoryPanel'
 interface AICalendarChatProps {
   onLocationSelect?: (location: any) => void
   onEventCreate?: (eventData: any) => void
+  onEventDelete?: (eventId: string) => void
   userLocation?: { latitude: number; longitude: number }
   context?: 'dashboard' | 'calendar'
   height?: number
+  styles?: any // 添加样式参数
 }
 
 const AICalendarChat: React.FC<AICalendarChatProps> = ({
   onLocationSelect,
   onEventCreate,
+  onEventDelete,
   userLocation,
   context = 'calendar',
-  height = 500
+  height = 500,
+  styles
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputMessage, setInputMessage] = useState('')
@@ -55,7 +59,19 @@ const AICalendarChat: React.FC<AICalendarChatProps> = ({
       }
     }
 
+    // 监听AI删除事件请求
+    const handleAIDeleteEvent = (event: any) => {
+      const { eventId, eventTitle } = event.detail
+      if (onEventDelete) {
+        console.log('AI请求删除事件:', eventTitle, eventId)
+        onEventDelete(eventId)
+      } else {
+        console.warn('⚠️ 警告: onEventDelete 回调不存在')
+      }
+    }
+
     window.addEventListener('storage', handleStorageChange)
+    window.addEventListener('aiDeleteEvent', handleAIDeleteEvent)
     
     // 每隔3秒检查聊天历史更新（用于同一标签页内的同步）
     const syncInterval = setInterval(loadChatHistory, 3000)
@@ -65,6 +81,7 @@ const AICalendarChat: React.FC<AICalendarChatProps> = ({
 
     return () => {
       window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('aiDeleteEvent', handleAIDeleteEvent)
       clearInterval(syncInterval)
     }
   }, [context])
@@ -131,7 +148,7 @@ const AICalendarChat: React.FC<AICalendarChatProps> = ({
       if (response.functionCalls && response.functionCalls.length > 0) {
         console.log("✅ AICalendarChat收到AI函数调用结果:", response.functionCalls)
         
-        // AI服务已经处理了事件创建，这里只需要响应结果
+        // AI服务已经处理了事件创建和删除，这里只需要响应结果
         for (const functionCall of response.functionCalls) {
           if (functionCall.name === "createCalendarEvent" && functionCall.success) {
             console.log("📅 AICalendarChat确认事件创建成功:", functionCall.result)
@@ -142,6 +159,24 @@ const AICalendarChat: React.FC<AICalendarChatProps> = ({
               onEventCreate(functionCall.result)
             } else {
               console.log("⚠️ 警告: onEventCreate 回调不存在")
+            }
+          } else if (functionCall.name === "deleteCalendarEvent" && functionCall.success) {
+            console.log("🗑️ AICalendarChat确认事件删除成功:", functionCall.result)
+            
+            // 处理单个事件删除
+            if (functionCall.result && functionCall.result.id && onEventDelete) {
+              console.log("调用父组件回调 onEventDelete (单个事件)")
+              onEventDelete(functionCall.result.id)
+            } 
+            // 处理批量删除
+            else if (functionCall.result && functionCall.result.events && Array.isArray(functionCall.result.events)) {
+              console.log("处理批量删除事件")
+              // 触发页面刷新或全局事件更新
+              window.dispatchEvent(new CustomEvent('calendarEventsUpdated', {
+                detail: { action: 'batchDelete', deletedCount: functionCall.result.deletedCount, source: 'AICalendarChat' }
+              }))
+            } else {
+              console.log("⚠️ 警告: 事件删除回调处理异常，结果:", functionCall.result)
             }
           }
         }
@@ -275,19 +310,24 @@ const AICalendarChat: React.FC<AICalendarChatProps> = ({
         <div className={`flex items-start space-x-3 max-w-[85%] ${
           isAssistant ? '' : 'flex-row-reverse space-x-reverse'
         }`}>
-          {/* 头像 */}
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-            isAssistant ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
-          }`}>
+          {/* 头像 - 使用主题样式 */}
+          <div className={`w-8 h-8 flex items-center justify-center flex-shrink-0 ${themeStyles.fontMono}`}
+               style={{ 
+                 backgroundColor: isAssistant ? themeStyles.accent + '20' : themeStyles.accent + '40',
+                 color: themeStyles.accent,
+                 borderRadius: themeStyles.borderRadius
+               }}>
             {isAssistant ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
           </div>
 
-          {/* 消息内容 */}
-          <div className={`rounded-lg px-4 py-3 ${
-            isAssistant 
-              ? 'bg-white border border-gray-200 text-gray-800' 
-              : 'bg-blue-600 text-white'
-          }`}>
+          {/* 消息内容 - 使用主题样式 */}
+          <div className={`px-4 py-3 ${themeStyles.fontMono}`}
+               style={{
+                 backgroundColor: isAssistant ? themeStyles.card.split(' ')[0].replace('bg-', '') : themeStyles.accent,
+                 border: isAssistant ? `1px solid ${themeStyles.accent}40` : 'none',
+                 color: isAssistant ? themeStyles.text.split(' ')[0].replace('text-', '') : '#ffffff',
+                 borderRadius: themeStyles.borderRadius
+               }}>
             {/* 消息文本 */}
             <div className="whitespace-pre-wrap text-sm leading-relaxed">
               {message.content}
@@ -388,10 +428,11 @@ const AICalendarChat: React.FC<AICalendarChatProps> = ({
               </div>
             )}
 
-            {/* 时间戳 */}
-            <div className={`text-xs mt-2 ${
-              isAssistant ? 'text-gray-400' : 'text-blue-200'
-            }`}>
+            {/* 时间戳 - 使用主题样式 */}
+            <div className={`text-xs mt-2 ${themeStyles.fontMono}`}
+                 style={{ 
+                   color: isAssistant ? themeStyles.textLight.split(' ')[0].replace('text-', '') : '#ffffff80'
+                 }}>
               {message.timestamp.toLocaleTimeString('zh-CN', {
                 hour: '2-digit',
                 minute: '2-digit'
@@ -403,18 +444,35 @@ const AICalendarChat: React.FC<AICalendarChatProps> = ({
     )
   }
 
+  // 使用主题样式，如果没有提供则使用默认样式
+  const themeStyles = styles || {
+    bg: 'bg-gray-50',
+    card: 'bg-white border border-gray-200',
+    text: 'text-gray-900',
+    textLight: 'text-gray-500',
+    accent: '#666666',
+    button: 'bg-gray-100 hover:bg-gray-200 text-gray-600',
+    fontMono: 'font-mono',
+    borderRadius: '8px'
+  }
+
   return (
-    <div className="flex flex-col h-full bg-gray-50" style={{ height: `${height}px` }}>
-      {/* 头部 */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3">
+    <div className={`flex flex-col h-full ${themeStyles.bg}`} style={{ height: `${height}px`, fontFamily: themeStyles.fontSecondary }}>
+      {/* 头部 - 使用主题样式 */}
+      <div className={`${themeStyles.card} px-4 py-3 border-b`} style={{ borderRadius: `${themeStyles.borderRadius} ${themeStyles.borderRadius} 0 0` }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-              <Bot className="w-4 h-4 text-blue-600" />
+            <div className={`w-8 h-8 flex items-center justify-center ${themeStyles.fontMono}`} 
+                 style={{ 
+                   backgroundColor: themeStyles.accent + '20', 
+                   borderRadius: themeStyles.borderRadius,
+                   color: themeStyles.accent 
+                 }}>
+              <Terminal className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-medium text-gray-900">AI日历助手</h3>
-              <p className="text-xs text-gray-500">
+              <h3 className={`font-medium ${themeStyles.text} ${themeStyles.fontMono}`}>// AI日历助手</h3>
+              <p className={`text-xs ${themeStyles.textLight} ${themeStyles.fontMono}`}>
                 {aiService.isServiceConfigured() ? '在线模式' : '演示模式'} • 具备长期记忆
               </p>
             </div>
@@ -423,17 +481,31 @@ const AICalendarChat: React.FC<AICalendarChatProps> = ({
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setShowHistoryPanel(true)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className={`p-2 transition-colors ${themeStyles.fontMono}`}
+              style={{ 
+                backgroundColor: 'transparent',
+                color: themeStyles.accent,
+                borderRadius: themeStyles.borderRadius
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = themeStyles.accent + '20'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               title="查看聊天历史"
             >
-              <History className="w-4 h-4 text-gray-600" />
+              <History className="w-4 h-4" />
             </button>
             <button
               onClick={handleNewConversation}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className={`p-2 transition-colors ${themeStyles.fontMono}`}
+              style={{ 
+                backgroundColor: 'transparent',
+                color: themeStyles.accent,
+                borderRadius: themeStyles.borderRadius
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = themeStyles.accent + '20'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               title="新建对话"
             >
-              <Settings className="w-4 h-4 text-gray-600" />
+              <Settings className="w-4 h-4" />
             </button>
           </div>
         </div>

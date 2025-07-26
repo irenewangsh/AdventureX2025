@@ -45,22 +45,37 @@ const firebaseConfig = hasValidFirebaseConfig() ? {
 export const isFirebaseConfigured = hasValidFirebaseConfig()
 
 // 初始化Firebase
-let app = null
-let auth = null
+let firebaseApp = null
+let firebaseAuth = null
 
-try {
-  if (isFirebaseConfigured) {
-    app = initializeApp(firebaseConfig)
-    auth = getAuth(app)
-    console.log('🔥 Firebase已成功初始化')
-  } else {
-    console.warn('⚠️  Firebase配置未找到，认证功能将被禁用')
-    console.warn('💡 请参考SETUP_GUIDE.md配置Firebase')
+if (isFirebaseConfigured) {
+  try {
+    firebaseApp = initializeApp(firebaseConfig)
+    console.log('🔥 Firebase App已初始化')
+  } catch (error) {
+    console.error('❌ Firebase App初始化失败:', error)
   }
-} catch (error) {
-  console.error('❌ Firebase初始化失败:', error)
-  console.warn('💡 请检查Firebase配置是否正确')
+  
+  try {
+    if (firebaseApp) {
+      firebaseAuth = getAuth(firebaseApp)
+      console.log('🔐 Firebase Auth已初始化')
+      console.log('🔐 Auth对象状态:', firebaseAuth ? '✅ 可用' : '❌ 不可用')
+      
+      // 暴露到window供调试使用
+      if (typeof window !== 'undefined' && firebaseAuth && firebaseApp) {
+        (window as any).firebaseAuth = firebaseAuth
+        (window as any).firebaseApp = firebaseApp
+        console.log('🌐 Firebase已暴露到window对象')
+      }
+    }
+  } catch (error) {
+    console.error('❌ Firebase Auth初始化失败:', error)
+  }
+} else {
+  console.warn('⚠️  Firebase配置未找到，认证功能将被禁用')
+  console.warn('💡 请参考SETUP_GUIDE.md配置Firebase')
 }
 
-export { auth }
-export default app
+export { firebaseAuth as auth }
+export default firebaseApp

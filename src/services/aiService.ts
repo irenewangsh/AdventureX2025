@@ -47,6 +47,13 @@ export interface CalendarEventParams {
   priority?: 'low' | 'medium' | 'high'
 }
 
+// 日历事件删除参数
+export interface CalendarEventDeleteParams {
+  query: string
+  dateFilter?: 'today' | 'tomorrow' | 'thisweek' | 'specificDate'
+  specificDate?: Date
+}
+
 class AIService {
   private isConfigured: boolean = false
   private apiKey: string | null = null
@@ -66,17 +73,28 @@ class AIService {
     return this.isConfigured
   }
 
-  // 🚀 新的系统提示词 - 基于ChatGPT建议
+  // 🚀 优化的系统提示词 - 基于ChatGPT意图识别建议
   private getSystemPrompt(): string {
-    return `你是一个智能日程安排助手，专门帮助用户管理日历事件。
+    return `你是一个智能日历助手。用户输入自然语言后，你需要**首先判断用户的意图**：
 
-**核心任务：当用户提到创建事件时，你需要：**
+**🎯 意图类型识别：**
+1. **创建事件** (create) - 用户想要添加新的日程安排
+   - 关键词：安排、预约、会议、约会、提醒、计划、事件、活动
+   - 示例："明天下午3点开会"、"安排一个项目会议"
 
-1. 解析用户输入的自然语言，提取事件信息
-2. 使用 createCalendarEvent 函数直接创建事件
-3. 返回确认信息
+2. **删除事件** (delete) - 用户想要移除已有的日程
+   - 关键词：删除、取消、清除、移除、去掉
+   - 示例："删除明天的会议"、"取消团队会议"、"清除日程"
+
+3. **修改事件** (update) - 用户想要更改已有日程的信息
+   - 关键词：修改、更改、调整、改到、改为
+   - 示例："把会议改到下午5点"、"修改明天的安排"
+
+**⚠️ 重要：不要默认所有输入都是创建事件！先分析意图，再执行对应操作！**
 
 **可用函数：**
+
+🔹 **创建事件：**
 createCalendarEvent({
   title: string,           // 事件标题
   startTime: string,       // 开始时间 (ISO格式)
@@ -87,18 +105,33 @@ createCalendarEvent({
   priority?: string        // 优先级：low/medium/high
 })
 
-**重要规则：**
-- 当识别到事件创建需求时，直接调用 createCalendarEvent 函数
-- 不要只返回JSON或解释，要实际调用函数
-- 时间格式使用ISO标准：YYYY-MM-DDTHH:mm:ss
-- 如果用户没有指定结束时间，默认1小时
-- 如果没有指定具体时间，智能推测合理时间
+🔹 **删除事件：**
+deleteCalendarEvent({
+  query: string,           // 搜索查询（事件标题或关键词）
+  dateFilter?: string      // 日期过滤：today/tomorrow/thisweek（可选）
+})
 
-**示例：**
-用户说："明天下午3点开个项目会议"
-你应该调用：createCalendarEvent({ title: "项目会议", startTime: "2025-01-XX T15:00:00", endTime: "2025-01-XXT16:00:00", category: "work" })
+**执行步骤：**
+1. 分析用户输入，确定意图类型 (create/delete/update)
+2. 提取相关信息（事件名称、时间、地点等）
+3. 调用对应的函数执行操作
+4. 返回清晰的确认信息
 
-现在你已准备好帮助用户管理日程！`
+**示例对话：**
+
+用户："明天下午3点开个项目会议"
+→ 意图：create
+→ 调用：createCalendarEvent({ title: "项目会议", startTime: "2025-01-XX T15:00:00", endTime: "2025-01-XX T16:00:00", category: "work" })
+
+用户："删除明天的项目会议"  
+→ 意图：delete
+→ 调用：deleteCalendarEvent({ query: "项目会议", dateFilter: "tomorrow" })
+
+用户："取消所有会议"
+→ 意图：delete  
+→ 调用：deleteCalendarEvent({ query: "会议" })
+
+**记住：明确识别意图，不要误把删除当成创建！**`
   }
 
   // 🎯 主要聊天接口 - 重构版
@@ -290,6 +323,8 @@ createCalendarEvent({
     }
   }
 
+
+
   // 🎨 获取分类颜色
   private getCategoryColor(category: string): string {
     const colors = {
@@ -303,15 +338,167 @@ createCalendarEvent({
     return colors[category as keyof typeof colors] || '#6b7280'
   }
 
-  // 🧠 智能模拟响应 - 支持事件创建
+  // 🧠 智能模拟响应 - 基于新的意图识别系统
   private async generateIntelligentMockResponse(message: string, options: AIRequestOptions): Promise<AIResponse> {
-    console.log('🤖 生成智能模拟响应')
+    console.log('🤖 生成智能模拟响应，分析用户意图:', message)
     
-    // 检测事件创建意图
-    const eventKeywords = ['安排', '预约', '会议', '约会', '提醒', '计划', '事件']
-    const hasEventIntent = eventKeywords.some(keyword => message.includes(keyword))
+    try {
+      // 🎯 使用新的意图识别服务
+      const intent: ParsedIntent = await AIIntentService.identifyIntent(message)
+      console.log('🎯 意图识别结果:', intent)
+      
+      // 根据意图类型处理
+      switch (intent.type) {
+        case 'delete':
+          return await this.handleDeleteIntent(intent)
+        
+        case 'confirm':
+          return await this.handleConfirmIntent(intent)
+        
+        case 'cancel':
+          return await this.handleCancelIntent(intent)
+        
+        case 'create':
+          return await this.handleCreateIntent(intent, options)
+        
+        case 'query':
+          return await this.handleQueryIntent(intent)
+        
+        default:
+          return await this.handleUnknownIntent(intent, options)
+      }
+      
+    } catch (error) {
+      console.error('意图识别失败:', error)
+      return {
+        content: '❌ 处理请求时发生错误，请稍后重试。',
+        suggestions: ['重新尝试', '查看帮助']
+      }
+    }
+  }
+  
+  // 🗑️ 处理删除意图
+  private async handleDeleteIntent(intent: ParsedIntent): Promise<AIResponse> {
+    console.log('🗑️ 处理删除意图:', intent)
     
-    if (hasEventIntent) {
+    const deleteResponse = await AICalendarDeleteService.processDeleteRequest(intent)
+    
+    return {
+      content: deleteResponse.message,
+      suggestions: deleteResponse.suggestions || ['重新尝试', '查看事件'],
+      functionCalls: deleteResponse.functionCalls
+    }
+  }
+  
+  // ✅ 处理确认意图
+  private async handleConfirmIntent(intent: ParsedIntent): Promise<AIResponse> {
+    console.log('✅ 处理确认意图')
+    
+    const deleteResponse = await AICalendarDeleteService.executeConfirmedDeletion()
+    
+    return {
+      content: deleteResponse.message,
+      suggestions: deleteResponse.suggestions || ['查看事件', '创建新事件'],
+      functionCalls: deleteResponse.functionCalls
+    }
+  }
+  
+  // 🚫 处理取消意图
+  private async handleCancelIntent(intent: ParsedIntent): Promise<AIResponse> {
+    console.log('🚫 处理取消意图')
+    
+    const deleteResponse = AICalendarDeleteService.cancelDeletion()
+    
+    return {
+      content: deleteResponse.message,
+      suggestions: deleteResponse.suggestions || ['查看事件', '创建新事件']
+    }
+  }
+  
+  // 📝 处理创建意图
+  private async handleCreateIntent(intent: ParsedIntent, options: AIRequestOptions): Promise<AIResponse> {
+    console.log('📝 处理创建意图:', intent)
+    
+    // 尝试从消息中解析事件信息
+    const eventInfo = this.parseEventFromMessage(intent.originalMessage)
+    
+    if (eventInfo) {
+      try {
+        const result = await this.executeCreateCalendarEvent(eventInfo)
+        
+        if (result.success) {
+          return {
+            content: `✅ **模拟AI已创建事件！**\n\n📅 **${result.event!.title}**\n🕐 ${result.event!.startTime.toLocaleString('zh-CN')}\n\n事件已添加到您的日历中。`,
+            suggestions: ['查看今日日程', '添加更多事件', '优化时间安排'],
+            functionCalls: [{
+              name: 'createCalendarEvent',
+              arguments: eventInfo,
+              success: true,
+              result: result.event
+            }]
+          }
+        } else {
+          return {
+            content: `❌ **创建事件失败**\n\n${result.message}`,
+            suggestions: ['重新尝试', '检查信息', '查看冲突']
+          }
+        }
+      } catch (error) {
+        console.error('创建事件失败:', error)
+        return {
+          content: '❌ 创建事件时发生错误，请稍后重试。',
+          suggestions: ['重新尝试', '查看日程']
+        }
+      }
+    } else {
+      return {
+        content: '📝 **需要更多信息来创建事件**\n\n请告诉我：\n• 事件名称\n• 日期和时间\n• 地点（可选）',
+        suggestions: ['明天上午会议', '今晚8点聚餐', '下周一培训']
+      }
+    }
+  }
+  
+  // 🔍 处理查询意图
+  private async handleQueryIntent(intent: ParsedIntent): Promise<AIResponse> {
+    console.log('🔍 处理查询意图:', intent)
+    
+    const events = CalendarService.getEvents()
+    let filteredEvents = events
+    
+    // 根据实体过滤事件
+    if (intent.entities.date) {
+      // 这里可以添加日期过滤逻辑
+    }
+    
+    if (filteredEvents.length === 0) {
+      return {
+        content: '📅 **暂无匹配的事件**\n\n您的日历目前没有安排的事件。',
+        suggestions: ['创建新事件', '查看本周', '添加提醒']
+      }
+    }
+    
+    const eventList = filteredEvents.slice(0, 5).map(event => 
+      `• **${event.title}** - ${event.startTime.toLocaleString('zh-CN')}`
+    ).join('\n')
+    
+    return {
+      content: `📅 **找到 ${filteredEvents.length} 个事件**\n\n${eventList}${filteredEvents.length > 5 ? '\n\n...' : ''}`,
+      suggestions: ['查看详情', '编辑事件', '删除事件']
+    }
+  }
+  
+  // ❓ 处理未知意图
+  private async handleUnknownIntent(intent: ParsedIntent, options: AIRequestOptions): Promise<AIResponse> {
+    console.log('❓ 处理未知意图，使用原有逻辑')
+    
+    // 回退到原有的逻辑 - 尝试检测创建意图作为回退
+    const message = intent.originalMessage
+    const createKeywords = ['安排', '预约', '会议', '约会', '提醒', '计划', '事件', '活动']
+    const hasCreateIntent = createKeywords.some(keyword => message.includes(keyword))
+    
+    console.log('🔍 回退创建意图检测:', hasCreateIntent, '关键词匹配:', createKeywords.filter(k => message.includes(k)))
+    
+    if (hasCreateIntent) {
       // 解析简单的事件信息
       const eventInfo = this.parseEventFromMessage(message)
       
@@ -334,16 +521,23 @@ createCalendarEvent({
           }
         } catch (error) {
           console.error('模拟事件创建失败:', error)
+          return {
+            content: '❌ 创建事件时发生错误，请稍后重试。',
+            suggestions: ['重新尝试', '检查输入格式']
+          }
         }
       }
     }
 
-    // 默认智能回复
+    // 默认智能回复（无明确意图时）
+    console.log('❓ 未识别到明确意图，返回默认回复')
     return {
-      content: `我理解您说的："${message}"\n\n虽然我目前在演示模式下运行，但我已经准备好帮助您管理日程。请配置OpenAI API密钥以获得完整功能。`,
-      suggestions: ['配置API密钥', '查看演示功能', '了解更多']
+      content: `我理解您说的："${message}"\n\n💡 **我可以帮您：**\n• 删除日程："删除7月30号的会议"\n• 创建事件："明天下午2点开会"\n• 查看安排："今天有什么事情"\n\n请尝试具体的指令！`,
+      suggestions: ['删除今天的事件', '添加新事件', '查看今日安排']
     }
   }
+
+
 
   // 📝 从消息中解析事件信息
   private parseEventFromMessage(message: string): CalendarEventParams | null {

@@ -435,6 +435,11 @@ const EnhancedCalendar: React.FC<EnhancedCalendarProps> = ({ className = '' }) =
               setShowEventForm(false)
               setEditEvent(null)
             }}
+            onDelete={(eventId) => {
+              handleDeleteEvent(eventId)
+              setShowEventForm(false)
+              setEditEvent(null)
+            }}
           />
         )}
       </div>

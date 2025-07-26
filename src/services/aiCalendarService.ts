@@ -76,6 +76,23 @@ class AICalendarService {
         startDate: 'Date',
         endDate: 'Date'
       }
+    },
+    {
+      name: 'deleteEvent',
+      description: '删除事件',
+      parameters: {
+        title: 'string',
+        eventId: 'string',
+        query: 'string'
+      }
+    },
+    {
+      name: 'searchEvents',
+      description: '搜索事件',
+      parameters: {
+        query: 'string',
+        date: 'Date'
+      }
     }
   ]
 
@@ -115,6 +132,16 @@ class AICalendarService {
       }
     }
     
+    // 删除事件意图
+    if (lowerMessage.includes('删除') || lowerMessage.includes('清除') || lowerMessage.includes('取消') || lowerMessage.includes('移除')) {
+      return {
+        type: 'delete',
+        query: message,
+        title: this.extractTitle(message),
+        confidence: 0.8
+      }
+    }
+    
     // 分析意图
     if (lowerMessage.includes('分析') || lowerMessage.includes('统计') || lowerMessage.includes('报告')) {
       return {
@@ -143,6 +170,9 @@ class AICalendarService {
         break
       case 'query':
         response = this.handleQueryEvents(intent, events)
+        break
+      case 'delete':
+        response = this.handleDeleteEvent(intent, events)
         break
       case 'find_time':
         response = this.handleFindTime(intent, events)
@@ -180,6 +210,88 @@ class AICalendarService {
 📍 地点：${intent.location || '未指定'}
 🏷️ 类别：${intent.category || '工作'}
 ⏰ 全天：${intent.allDay ? '是' : '否'}`
+  }
+
+  // 处理删除事件
+  private handleDeleteEvent(intent: CalendarIntent, events: CalendarEvent[]): string {
+    const query = intent.query?.toLowerCase() || ''
+    const title = intent.title?.toLowerCase() || ''
+    
+    // 搜索匹配的事件
+    let matchingEvents = events.filter(event => {
+      const eventTitle = event.title.toLowerCase()
+      const eventDesc = event.description?.toLowerCase() || ''
+      
+      // 优先匹配标题
+      if (title && eventTitle.includes(title)) {
+        return true
+      }
+      
+      // 然后匹配描述或查询内容
+      return eventTitle.includes(query) || 
+             eventDesc.includes(query) ||
+             query.includes(eventTitle)
+    })
+    
+    // 如果查询包含日期信息，进一步过滤
+    if (query.includes('今天')) {
+      const today = new Date()
+      matchingEvents = matchingEvents.filter(event => 
+        event.startTime.toDateString() === today.toDateString()
+      )
+    } else if (query.includes('明天')) {
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      matchingEvents = matchingEvents.filter(event => 
+        event.startTime.toDateString() === tomorrow.toDateString()
+      )
+    } else if (query.includes('这周') || query.includes('本周')) {
+      const now = new Date()
+      const weekStart = new Date(now)
+      weekStart.setDate(now.getDate() - now.getDay())
+      const weekEnd = new Date(weekStart)
+      weekEnd.setDate(weekStart.getDate() + 7)
+      
+      matchingEvents = matchingEvents.filter(event => 
+        event.startTime >= weekStart && event.startTime < weekEnd
+      )
+    }
+    
+    if (matchingEvents.length === 0) {
+      if (title) {
+        return `❌ 未找到标题包含"${title}"的事件。请检查事件名称是否正确。`
+      }
+      return '❌ 未找到匹配的事件。请提供更具体的事件信息，例如："删除团队会议"或"删除今天的会议"。'
+    }
+    
+    if (matchingEvents.length === 1) {
+      const event = matchingEvents[0]
+      
+      // 触发删除事件
+      window.dispatchEvent(new CustomEvent('aiDeleteEvent', {
+        detail: { eventId: event.id, eventTitle: event.title }
+      }))
+      
+      return `✅ 已删除事件："${event.title}"
+📅 时间：${event.startTime.toLocaleString()}
+📍 地点：${event.location || '未指定'}`
+    }
+    
+    // 多个匹配事件时，列出供用户选择
+    let response = `🔍 找到 ${matchingEvents.length} 个匹配的事件，请明确指定要删除哪个：\n\n`
+    matchingEvents.slice(0, 5).forEach((event, index) => {
+      response += `${index + 1}. ${event.title}\n`
+      response += `   ⏰ ${event.startTime.toLocaleString()}\n`
+      response += `   📍 ${event.location || '未指定地点'}\n\n`
+    })
+    
+    if (matchingEvents.length > 5) {
+      response += `... 还有 ${matchingEvents.length - 5} 个事件\n\n`
+    }
+    
+    response += '💡 提示：请使用更具体的事件名称，例如："删除明天的团队会议"'
+    
+    return response
   }
 
   // 处理查询事件
